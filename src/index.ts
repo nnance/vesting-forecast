@@ -27,7 +27,7 @@ const grants = lines.filter((line) => line.startsWith('Grant'))
 const grantSchedule: Grant[] = grants
     .map((line) => line.split(','))
     .map((row) => ({
-        grantNumber: row[12],
+        grantNumber: row[12].includes('"') ? row[13] : row[12],
         grantDate: new Date(row[2]),
         grantQty: parseInt(row[4]),
         vestedQty: parseInt(row[6]),
@@ -73,6 +73,26 @@ const forecast: Grant[] = grantScheduleByGrantNumber.map((grant) => {
     }
 })
 
+const validateForecast = (forecast: Grant[]) => {
+    const errors: string[] = []
+    forecast.forEach((grant) => {
+        const { grantNumber, vestedQty, grantQty } = grant
+        const vestedQtySum = grant.vestEvents.reduce(
+            (sum, vest) => sum + vest.vestedQty,
+            0
+        )
+        if (vestedQtySum < grantQty - 5 || vestedQtySum > grantQty + 5) {
+            errors.push(
+                `Grant ${grantNumber} has ${vestedQtySum} vested, but ${grantQty} expected`
+            )
+        }
+    })
+    if (errors.length > 0) {
+        console.error(errors.join('\n'))
+        process.exit(1)
+    }
+}
+
 // create a single array of all vest events ordered by vest date
 const vestsByDate: VestEvent[] = forecast
     .reduce(
@@ -102,4 +122,10 @@ const vestsTotalByQuarter = Object.keys(vestsTotalByDate).reduce(
     {} as { [quarter: string]: number }
 )
 
-console.dir(vestsTotalByQuarter, { depth: null })
+const vestsToCSV = Object.keys(vestsTotalByQuarter).reduce(
+    (csv, quarter) => `${csv}\n${quarter},${vestsTotalByQuarter[quarter]}`,
+    ''
+)
+
+validateForecast(forecast)
+process.stdout.write(vestsToCSV)
