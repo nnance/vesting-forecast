@@ -45,12 +45,32 @@ const vestingSchedule: VestEvent[] = vesting
         vestedQty: parseInt(row[25]),
     }))
 
-const grantScheduleByGrantNumber = vestingSchedule.reduce((grants, vest) => {
-    const grant = grants.find((g) => g.grantNumber === vest.grantNumber)
-    if (grant) {
-        grant.vestEvents.push(vest)
-    }
-    return grants
-}, grantSchedule)
+const grantScheduleByGrantNumber = grantSchedule.map((grant) => ({
+    ...grant,
+    vestEvents: vestingSchedule.filter(
+        (vest) => vest.grantNumber === grant.grantNumber
+    ),
+}))
 
-console.dir(grantSchedule, { depth: null })
+const forecast = grantScheduleByGrantNumber.map((grant) => {
+    const { vestEvents, grantQty, grantDate } = grant
+    const periods = vestEvents.length
+    const hasCliff = grantDate > new Date('2021-01-01')
+
+    const calcQty = (period: number) =>
+        hasCliff
+            ? period === 0
+                ? Math.round(grantQty / 4)
+                : Math.round((grantQty - grantQty / 4) / (periods - 1))
+            : Math.round(grantQty / periods)
+
+    return {
+        ...grant,
+        vestEvents: vestEvents.map((vest, idx) => ({
+            ...vest,
+            vestedQty: vest.vestedQty === 0 ? calcQty(idx) : vest.vestedQty,
+        })),
+    }
+})
+
+console.dir(forecast, { depth: null })
