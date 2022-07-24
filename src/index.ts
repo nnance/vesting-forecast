@@ -52,7 +52,7 @@ const grantScheduleByGrantNumber = grantSchedule.map((grant) => ({
     ),
 }))
 
-const forecast = grantScheduleByGrantNumber.map((grant) => {
+const forecast: Grant[] = grantScheduleByGrantNumber.map((grant) => {
     const { vestEvents, grantQty, grantDate } = grant
     const periods = vestEvents.length
     const hasCliff = grantDate > new Date('2021-01-01')
@@ -73,4 +73,33 @@ const forecast = grantScheduleByGrantNumber.map((grant) => {
     }
 })
 
-console.dir(forecast, { depth: null })
+// create a single array of all vest events ordered by vest date
+const vestsByDate: VestEvent[] = forecast
+    .reduce(
+        (vests, grant) => [...vests, ...grant.vestEvents],
+        [] as VestEvent[]
+    )
+    .sort((a, b) => a.vestDate.getTime() - b.vestDate.getTime())
+
+const vestsTotalByDate = vestsByDate.reduce(
+    (total, vest) => ({
+        ...total,
+        [vest.vestDate.toISOString().split('T')[0]]:
+            (total[vest.vestDate.toISOString().split('T')[0]] || 0) +
+            vest.vestedQty,
+    }),
+    {} as { [date: string]: number }
+)
+
+const vestsTotalByQuarter = Object.keys(vestsTotalByDate).reduce(
+    (total, date) => {
+        const quarterStr = `${moment(date).year()}-Q${moment(date).quarter()}`
+        return {
+            ...total,
+            [quarterStr]: (total[quarterStr] || 0) + vestsTotalByDate[date],
+        }
+    },
+    {} as { [quarter: string]: number }
+)
+
+console.dir(vestsTotalByQuarter, { depth: null })
